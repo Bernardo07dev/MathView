@@ -13,6 +13,7 @@ import {
 } from 'chart.js'
 import { create, all } from 'mathjs'
 import { interpretWithAI } from './ai/interpretWithAI'
+import mathLogo from './assets/math.svg'
 
 ChartJS.register(
   CategoryScale,
@@ -129,8 +130,11 @@ function App() {
   }
 
   return (
-    <div style={{ maxWidth: 960, margin: '24px auto', padding: 16 }}>
-      <h2 style={{ marginBottom: 12 }}>MathView — Gráfico a partir de Fórmula</h2>
+    <div className="mv-container">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        <img src={mathLogo} alt="Math logo" width={40} height={40} />
+        <h2 style={{ margin: 0 }}>MathView — Gráfico a partir de Fórmula</h2>
+      </div>
 
       <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr' }}>
         <label>
@@ -139,11 +143,11 @@ function App() {
             value={inputFormula}
             onChange={(e) => setInputFormula(e.target.value)}
             placeholder="ex: sin(x) + 0.5*x ou pow(x,2) + 3*x"
-            style={{ width: '100%', padding: 8, marginTop: 6 }}
+            className="mv-input"
           />
         </label>
 
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <div className="mv-row">
           <label style={{ flex: '1 1 160px' }}>
             xMin
             <input
@@ -151,7 +155,7 @@ function App() {
               value={xMin}
               onChange={(e) => setXMin(e.target.value)}
               onBlur={validateRange}
-              style={{ width: '100%', padding: 8, marginTop: 6 }}
+              className="mv-input"
             />
           </label>
           <label style={{ flex: '1 1 160px' }}>
@@ -161,7 +165,7 @@ function App() {
               value={xMax}
               onChange={(e) => setXMax(e.target.value)}
               onBlur={validateRange}
-              style={{ width: '100%', padding: 8, marginTop: 6 }}
+              className="mv-input"
             />
           </label>
           <label style={{ flex: '1 1 160px' }}>
@@ -172,14 +176,14 @@ function App() {
               onChange={(e) => setSamples(e.target.value)}
               min={10}
               max={2000}
-              style={{ width: '100%', padding: 8, marginTop: 6 }}
+              className="mv-input"
             />
           </label>
         </div>
 
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <button onClick={handleUseAI} style={{ padding: '8px 12px' }}>Gerar com IA</button>
-          <button onClick={clearAI} style={{ padding: '8px 12px' }}>Limpar IA</button>
+        <div className="mv-row mv-actions">
+          <button onClick={handleUseAI}>Gerar com IA</button>
+          <button onClick={clearAI}>Limpar IA</button>
         </div>
 
         {aiStatus && (
@@ -193,10 +197,14 @@ function App() {
           <div style={{ color: 'crimson' }}>{errorMsg}</div>
         )}
 
-        <div style={{ background: '#fff', padding: 12, borderRadius: 8 }}>
+        <div className="mv-card">
           <Line data={data} options={options} />
         </div>
       </div>
+
+      <footer style={{ marginTop: 32, paddingTop: 16, borderTop: '1px solid #e5e7eb', textAlign: 'center', fontSize: 14, color: '#6b7280' }}>
+        Página desenvolvida por <strong>Bernardo Moreira</strong> - Aluno da FIAP
+      </footer>
     </div>
   )
 }

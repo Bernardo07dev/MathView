@@ -40,3 +40,49 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Mobile-friendly tweaks for MathView */
+.mv-container {
+  max-width: 960px;
+  margin: 24px auto;
+  padding: 16px;
+  text-align: left;
+}
+
+.mv-card {
+  background: #fff;
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.mv-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mv-input {
+  width: 100%;
+  padding: 8px;
+  margin-top: 6px;
+}
+
+.mv-actions button {
+  padding: 8px 12px;
+}
+
+@media (max-width: 640px) {
+  #root {
+    padding: 1rem;
+  }
+  .mv-container {
+    margin: 16px auto;
+    padding: 12px;
+  }
+  .mv-actions {
+    flex-direction: column;
+  }
+  .mv-actions button {
+    width: 100%;
+  }
+}
