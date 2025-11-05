@@ -12,8 +12,8 @@ import {
   Legend
 } from 'chart.js'
 import { create, all } from 'mathjs'
-import { interpretWithAI } from './ai/interpretWithAI'
 import mathLogo from './assets/math.svg'
+import { integrateExpression } from './utils/integrate'
 
 ChartJS.register(
   CategoryScale,
@@ -29,24 +29,29 @@ const math = create(all, {})
 
 function App() {
   const [inputFormula, setInputFormula] = useState('sin(x) + 0.5 * x')
-  const [aiStatus, setAiStatus] = useState('')
-  const [aiExpression, setAiExpression] = useState('')
-  const [xMin, setXMin] = useState(-10)
-  const [xMax, setXMax] = useState(10)
   const [samples, setSamples] = useState(400)
-  const [errorMsg, setErrorMsg] = useState('')
+  const [showDerivative, setShowDerivative] = useState(false)
+  const [derivedExpression, setDerivedExpression] = useState('')
+  const [intA, setIntA] = useState(-1)
+  const [intB, setIntB] = useState(1)
+  const [intResult, setIntResult] = useState('')
 
-  const currentExpression = aiExpression || inputFormula
+  // Valores fixos para o intervalo
+  const xMin = -10
+  const xMax = 10
+  const currentExpression = inputFormula
 
-  const { labels, values } = useMemo(() => {
+  const { labels, values, valuesDerivative } = useMemo(() => {
     const count = Math.max(2, Math.min(2000, Number(samples) || 400))
     const min = Number(xMin)
     const max = Number(xMax)
     const step = (max - min) / (count - 1)
     const xs = []
     const ys = []
+    const dys = []
 
     let compiled
+    let compiledDerivative
     try {
       compiled = math.compile(currentExpression)
     } catch (e) {
@@ -54,28 +59,53 @@ function App() {
       try {
         compiled = math.compile(inputFormula)
       } catch (e2) {
-        return { labels: [], values: [] }
+        return { labels: [], values: [], valuesDerivative: [] }
       }
+    }
+
+    // Try to compute symbolic derivative if requested
+    if (showDerivative) {
+      try {
+        const node = math.derivative(currentExpression, 'x')
+        setDerivedExpression(node.toString())
+        compiledDerivative = node.compile()
+      } catch (e) {
+        // If derivative fails, clear expression and skip plotting derivative
+        setDerivedExpression('')
+        compiledDerivative = null
+      }
+    } else {
+      setDerivedExpression('')
     }
 
     for (let i = 0; i < count; i++) {
       const x = min + step * i
       let y = NaN
+      let dy = NaN
       try {
         y = compiled.evaluate({ x })
       } catch (e) {
         y = NaN
       }
+      if (compiledDerivative) {
+        try {
+          dy = compiledDerivative.evaluate({ x })
+        } catch (e) {
+          dy = NaN
+        }
+      }
       xs.push(Number(x.toFixed(4)))
       ys.push(Number((Number.isFinite(y) ? y : NaN).toFixed(4)))
+      if (showDerivative) {
+        dys.push(Number((Number.isFinite(dy) ? dy : NaN).toFixed(4)))
+      }
     }
 
-    return { labels: xs, values: ys }
-  }, [currentExpression, inputFormula, xMin, xMax, samples])
+    return { labels: xs, values: ys, valuesDerivative: dys }
+  }, [currentExpression, inputFormula, samples, showDerivative])
 
-  const data = useMemo(() => ({
-    labels,
-    datasets: [
+  const data = useMemo(() => {
+    const ds = [
       {
         label: 'f(x)',
         data: values,
@@ -84,9 +114,22 @@ function App() {
         pointRadius: 0,
         borderWidth: 2,
         spanGaps: true,
-      }
+      },
     ]
-  }), [labels, values])
+    if (showDerivative && valuesDerivative?.length) {
+      ds.push({
+        label: "f'(x)",
+        data: valuesDerivative,
+        borderColor: 'rgb(16, 185, 129)',
+        backgroundColor: 'rgba(16, 185, 129, 0.25)',
+        pointRadius: 0,
+        borderWidth: 2,
+        borderDash: [6, 4],
+        spanGaps: true,
+      })
+    }
+    return { labels, datasets: ds }
+  }, [labels, values, valuesDerivative, showDerivative])
 
   const options = useMemo(() => ({
     responsive: true,
@@ -101,33 +144,6 @@ function App() {
     animation: false,
   }), [])
 
-  async function handleUseAI() {
-    setErrorMsg('')
-    setAiStatus('Interpretando com IA...')
-    const result = await interpretWithAI(inputFormula)
-    if (result.note) {
-      setAiStatus(result.note)
-    } else {
-      setAiStatus(result.usedAI ? 'Interpretação via IA aplicada.' : 'Sem IA, usando expressão original.')
-    }
-    setAiExpression(result.expression || '')
-  }
-
-  function clearAI() {
-    setAiExpression('')
-    setAiStatus('')
-  }
-
-  function validateRange() {
-    const min = Number(xMin)
-    const max = Number(xMax)
-    if (!Number.isFinite(min) || !Number.isFinite(max) || min >= max) {
-      setErrorMsg('Intervalo inválido: xMin deve ser menor que xMax')
-      return false
-    }
-    setErrorMsg('')
-    return true
-  }
 
   return (
     <div className="mv-container">
@@ -149,26 +165,6 @@ function App() {
 
         <div className="mv-row">
           <label style={{ flex: '1 1 160px' }}>
-            xMin
-            <input
-              type="number"
-              value={xMin}
-              onChange={(e) => setXMin(e.target.value)}
-              onBlur={validateRange}
-              className="mv-input"
-            />
-          </label>
-          <label style={{ flex: '1 1 160px' }}>
-            xMax
-            <input
-              type="number"
-              value={xMax}
-              onChange={(e) => setXMax(e.target.value)}
-              onBlur={validateRange}
-              className="mv-input"
-            />
-          </label>
-          <label style={{ flex: '1 1 160px' }}>
             Amostras
             <input
               type="number"
@@ -181,25 +177,58 @@ function App() {
           </label>
         </div>
 
-        <div className="mv-row mv-actions">
-          <button onClick={handleUseAI}>Gerar com IA</button>
-          <button onClick={clearAI}>Limpar IA</button>
-        </div>
-
-        {aiStatus && (
-          <div style={{ fontSize: 12, color: '#555' }}>{aiStatus}</div>
-        )}
-        {aiExpression && (
-          <div style={{ fontSize: 12, color: '#111' }}>Expressão usada: {aiExpression}</div>
-        )}
-
-        {errorMsg && (
-          <div style={{ color: 'crimson' }}>{errorMsg}</div>
+        {showDerivative && derivedExpression && (
+          <div style={{ fontSize: 12, color: '#0f766e' }}>Derivada simbólica: {derivedExpression}</div>
         )}
 
         <div className="mv-card">
           <Line data={data} options={options} />
         </div>
+
+        <div className="mv-row" style={{ alignItems: 'center' }}>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              type="checkbox"
+              checked={showDerivative}
+              onChange={(e) => setShowDerivative(e.target.checked)}
+            />
+            Mostrar derivada f'(x)
+          </label>
+        </div>
+
+        <div className="mv-row" style={{ alignItems: 'flex-end' }}>
+          <label style={{ flex: '1 1 140px' }}>
+            Integral de (a)
+            <input
+              type="number"
+              value={intA}
+              onChange={(e) => setIntA(e.target.value)}
+              className="mv-input"
+            />
+          </label>
+          <label style={{ flex: '1 1 140px' }}>
+            até (b)
+            <input
+              type="number"
+              value={intB}
+              onChange={(e) => setIntB(e.target.value)}
+              className="mv-input"
+            />
+          </label>
+          <div className="mv-actions" style={{ display: 'flex', gap: 12 }}>
+            <button onClick={() => {
+              try {
+                const val = integrateExpression(currentExpression, Number(intA), Number(intB), 1000, math)
+                setIntResult(String(Number(val.toFixed(6))))
+              } catch (e) {
+                setIntResult('Erro ao integrar')
+              }
+            }}>Calcular integral</button>
+          </div>
+        </div>
+        {intResult !== '' && (
+          <div style={{ fontSize: 12, color: '#374151' }}>∫ de {intA} a {intB} f(x) dx = <strong>{intResult}</strong></div>
+        )}
       </div>
 
       <footer style={{ marginTop: 32, paddingTop: 16, borderTop: '1px solid #e5e7eb', textAlign: 'center', fontSize: 14, color: '#6b7280' }}>
